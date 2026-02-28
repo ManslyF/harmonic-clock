@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#000000">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Harmonic Clock">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <title>Harmonic Clock</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: #000;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+        }
+        
+        #canvas {
+            display: block;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        
+        #canvas.flicker {
+            animation: flicker var(--flicker-duration) ease-in-out;
+        }
+        
+        @keyframes flicker {
+            0% { opacity: 1; filter: brightness(1); }
+            20% { opacity: var(--flicker-darkness); filter: brightness(var(--flicker-darkness)); }
+            40% { opacity: 1; filter: brightness(var(--flicker-brightness)); }
+            60% { opacity: 0.8; filter: brightness(var(--flicker-mid-bright)); }
+            80% { opacity: 1; filter: brightness(var(--flicker-end-bright)); }
+            100% { opacity: 1; filter: brightness(1); }
+        }
+        
+        #timeDisplay {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: white;
+            font-size: 40px;
+            font-weight: 300;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            z-index: 10;
+        }
+        
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            color: white;
+            font-size: 14px;
+            opacity: 0.7;
+            z-index: 10;
+        }
+        
+        #settingsMenu {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(20, 20, 20, 0.95);
+            padding: 30px;
+            border-radius: 15px;
+            color: white;
+            font-size: 18px;
+            z-index: 100;
+            min-width: 300px;
+            max-width: 90vw;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+        }
+        
+        #settingsMenu h2 {
+            margin: 0 0 20px 0;
+            font-size: 24px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+            padding-bottom: 10px;
+        }
+        
+        .setting-group {
+            margin-bottom: 20px;
+        }
+        
+        .setting-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 14px;
+            opacity: 0.8;
+        }
+        
+        .setting-group select,
+        .setting-group input {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white;
+            border-radius: 5px;
+        }
+        
+        .setting-group input[type="range"] {
+            padding: 0;
+        }
+        
+        .range-value {
+            display: inline-block;
+            margin-left: 10px;
+            font-weight: bold;
+        }
+        
+        #closeSettings {
+            width: 100%;
+            padding: 15px;
+            margin-top: 20px;
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        
+        #closeSettings:active {
+            background: rgba(255,255,255,0.3);
+        }
+        
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <div id="timeDisplay"></div>
+    
+    <div id="settingsMenu" class="hidden">
+        <h2>⚙️ Einstellungen</h2>
+        
+        <div class="setting-group">
+            <label>Zeitmodus:</label>
+            <select id="settingSelect">
+                <option value="0">Sekunden (schnell)</option>
+                <option value="1">Minuten</option>
+                <option value="2">12 Stunden</option>
+                <option value="3">24 Stunden</option>
+            </select>
+        </div>
+        
+        <div class="setting-group">
+            <label>Farbschema:</label>
+            <select id="colorSchemeSelect">
+                <option value="triadic">Triadisch (120°)</option>
+                <option value="split_complementary">Split-Komplementär</option>
+                <option value="analogous">Benachbart</option>
+                <option value="golden_ratio">Goldener Schnitt</option>
+                <option value="tetradic">Rechteck (90°)</option>
+                <option value="double_split">Erweitert Split</option>
+            </select>
+        </div>
+        
+        <div class="setting-group">
+            <label>Sättigung: <span class="range-value" id="satValue">0.7</span></label>
+            <input type="range" id="satRange" min="0" max="100" value="70" step="1">
+        </div>
+        
+        <div class="setting-group">
+            <label>Helligkeit: <span class="range-value" id="lumValue">0.5</span></label>
+            <input type="range" id="lumRange" min="0" max="100" value="50" step="1">
+        </div>
+        
+        <div class="setting-group">
+            <label>Farbverschiebung: <span class="range-value" id="farbvValue">0.5</span></label>
+            <input type="range" id="farbvRange" min="0" max="100" value="50" step="1">
+        </div>
+        
+        <div class="setting-group">
+            <label>Ring-Abstand: <span class="range-value" id="gapValue">4</span> px</label>
+            <input type="range" id="gapRange" min="0" max="50" value="4" step="1">
+        </div>
+        
+        <div class="setting-group">
+            <label>Zeitanzeige:</label>
+            <select id="txtimeSelect">
+                <option value="true">Anzeigen</option>
+                <option value="false">Ausblenden</option>
+            </select>
+        </div>
+        
+        <button id="closeSettings">✓ Schließen</button>
+    </div>
+
+    <script>
+        // Service Worker registrieren
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js').then(() => {
+                console.log('Service Worker registriert');
+            }).catch(err => {
+                console.log('Service Worker Fehler:', err);
+            });
+        }
+
+        // ============================================
+        // EINSTELLUNGEN - Aus deiner Version
+        // ============================================
+        const CONFIG = {
+            setting: 3,              // 0=sek, 1=min, 2=12h, 3=24h
+            colorScheme: 'analogous',
+            winkel: 20,
+            sat: 0.7,
+            lum: 0.5,
+            farbv: 0.5,
+            
+            // Ring-Dicken
+            abst_sm: 15,
+            abst_mh: 40,
+            
+            // Leere Abstände zwischen Ringen
+            gap_sm: 4,
+            gap_mh: 4,
+            
+            txtime: false,
+            margin: 20,
+            
+            // Flacker-Effekt Einstellungen
+            flickerEnabled: true,     // Flacker-Effekt ein/aus
+            flickerDuration: 200,     // Gesamtdauer in ms
+            flickerDarkness: 0.1,     // Wie dunkel beim Fade (0.0-1.0)
+            flickerBrightness: 4.0,   // Wie hell beim Aufblitzen (1.0-5.0)
+            flickerMidBright: 3.5,    // Mittlere Helligkeit
+            flickerEndBright: 1.3     // Helligkeit vor Normalzustand
+        };
+
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const timeDisplay = document.getElementById('timeDisplay');
+        const settingsMenu = document.getElementById('settingsMenu');
+        
+        let animationId;
+        let lastSecond = -1;
+        
+        // CSS-Variablen für Flacker-Effekt setzen
+        function updateFlickerCSS() {
+            document.documentElement.style.setProperty('--flicker-duration', `${CONFIG.flickerDuration}ms`);
+            document.documentElement.style.setProperty('--flicker-darkness', CONFIG.flickerDarkness);
+            document.documentElement.style.setProperty('--flicker-brightness', CONFIG.flickerBrightness);
+            document.documentElement.style.setProperty('--flicker-mid-bright', CONFIG.flickerMidBright);
+            document.documentElement.style.setProperty('--flicker-end-bright', CONFIG.flickerEndBright);
+        }
+        updateFlickerCSS();
+        
+        // Touch-Gesten Variablen
+        let touchStartY = 0;
+        let touchStartX = 0;
+        let touchStartTime = 0;
+        let lastTapTime = 0;
+        const DOUBLE_TAP_DELAY = 300;
+        const SWIPE_THRESHOLD = 100;
+        
+        function resizeCanvas() {
+            const size = Math.min(window.innerWidth, window.innerHeight) - CONFIG.margin * 2;
+            canvas.width = size;
+            canvas.height = size;
+        }
+        
+        function getHarmonicColor1(hue) {
+            switch(CONFIG.colorScheme) {
+                case 'split_complementary':
+                    return (hue + (180 - CONFIG.winkel) / 360) % 1.0;
+                case 'triadic':
+                    return (hue + 120 / 360) % 1.0;
+                case 'analogous':
+                    return (hue + CONFIG.winkel / 360) % 1.0;
+                case 'tetradic':
+                    return (hue + 90 / 360) % 1.0;
+                case 'double_split':
+                    return (hue + 150 / 360) % 1.0;
+                case 'golden_ratio':
+                    return (hue + 137.5 / 360) % 1.0;
+                default:
+                    return hue;
+            }
+        }
+        
+        function getHarmonicColor2(hue) {
+            switch(CONFIG.colorScheme) {
+                case 'split_complementary':
+                    return (hue + (180 + CONFIG.winkel) / 360) % 1.0;
+                case 'triadic':
+                    return (hue + 240 / 360) % 1.0;
+                case 'analogous':
+                    return (hue + 2 * CONFIG.winkel / 360) % 1.0;
+                case 'tetradic':
+                    return (hue + 180 / 360) % 1.0;
+                case 'double_split':
+                    return (hue + 210 / 360) % 1.0;
+                case 'golden_ratio':
+                    return (hue + 275 / 360) % 1.0;
+                default:
+                    return hue;
+            }
+        }
+        
+        function hlsToRgb(h, l, s) {
+            let r, g, b;
+            
+            if (s === 0) {
+                r = g = b = l;
+            } else {
+                const hue2rgb = (p, q, t) => {
+                    if (t < 0) t += 1;
+                    if (t > 1) t -= 1;
+                    if (t < 1/6) return p + (q - p) * 6 * t;
+                    if (t < 1/2) return q;
+                    if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+                    return p;
+                };
+                
+                const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+                const p = 2 * l - q;
+                r = hue2rgb(p, q, h + 1/3);
+                g = hue2rgb(p, q, h);
+                b = hue2rgb(p, q, h - 1/3);
+            }
+            
+            return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+        }
+        
+        function drawPieSlice(centerX, centerY, radius, startAngle, endAngle, color) {
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+            ctx.closePath();
+            ctx.fill();
+        }
+        
+        function drawClock() {
+            const now = new Date();
+            const hour24 = now.getHours();
+            const minute = now.getMinutes();
+            const second = now.getSeconds();
+            
+            // Flacker-Effekt bei Sekundenwechsel auf 0
+            if (CONFIG.flickerEnabled && second === 0 && lastSecond === 59) {
+                canvas.classList.add('flicker');
+                setTimeout(() => canvas.classList.remove('flicker'), CONFIG.flickerDuration);
+            }
+            lastSecond = second;
+            
+            const hour = hour24 < 13 ? hour24 : hour24 - 12;
+            const secondCalc = second === 0 ? 60 : second;
+            
+            let hslS;
+            switch(CONFIG.setting) {
+                case 0:
+                    hslS = (secondCalc * 6) / 360;
+                    break;
+                case 1:
+                    hslS = (minute * 60 + second) / 3600;
+                    break;
+                case 2:
+                    hslS = (hour * 3600 + minute * 60 + second) / 43200;
+                    break;
+                case 3:
+                    hslS = (hour24 * 3600 + minute * 60 + second) / 86400;
+                    break;
+            }
+            
+            hslS = (hslS + CONFIG.farbv) % 1.0;
+            
+            const hue1 = hslS;
+            const hue2 = getHarmonicColor1(hslS);
+            const hue3 = getHarmonicColor2(hslS);
+            
+            const rgb1 = hlsToRgb(hue1, CONFIG.lum, CONFIG.sat);
+            const rgb2 = hlsToRgb(hue2, CONFIG.lum, CONFIG.sat);
+            const rgb3 = hlsToRgb(hue3, CONFIG.lum, CONFIG.sat);
+            
+            const color1 = `rgb(${rgb1[0]}, ${rgb1[1]}, ${rgb1[2]})`;
+            const color2 = `rgb(${rgb2[0]}, ${rgb2[1]}, ${rgb2[2]})`;
+            const color3 = `rgb(${rgb3[0]}, ${rgb3[1]}, ${rgb3[2]})`;
+            
+            const angleS = (-90 + secondCalc * 6) * Math.PI / 180;
+            const angleM = (-90 + minute * 6) * Math.PI / 180;
+            const angleH = (-90 + hour * 30) * Math.PI / 180;
+            
+            const startAngle = -90 * Math.PI / 180;
+            
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const radius = canvas.width / 2;
+            
+            drawPieSlice(centerX, centerY, radius, startAngle, angleS, color1);
+            
+            const radiusAfterSec = radius - CONFIG.abst_sm;
+            ctx.fillStyle = '#000';
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radiusAfterSec, 0, 2 * Math.PI);
+            ctx.fill();
+            
+            const radiusMin = radiusAfterSec - CONFIG.gap_sm;
+            drawPieSlice(centerX, centerY, radiusMin, startAngle, angleM, color2);
+            
+            const radiusAfterMin = radiusMin - CONFIG.abst_mh;
+            ctx.fillStyle = '#000';
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radiusAfterMin, 0, 2 * Math.PI);
+            ctx.fill();
+            
+            const radiusHour = radiusAfterMin - CONFIG.gap_mh;
+            drawPieSlice(centerX, centerY, radiusHour, startAngle, angleH, color3);
+            
+            if (hour === 0) {
+                ctx.strokeStyle = color3;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, radiusHour, 0, 2 * Math.PI);
+                ctx.stroke();
+            }
+            
+            if (CONFIG.txtime) {
+                timeDisplay.textContent = `${hour}:${minute.toString().padStart(2, '0')}:${second.toString().padStart(2, '0')}`;
+            } else {
+                timeDisplay.textContent = '';
+            }
+        }
+        
+        function animate() {
+            drawClock();
+            animationId = requestAnimationFrame(animate);
+        }
+        
+        window.addEventListener('resize', resizeCanvas);
+        
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'f' || e.key === 'F') {
+                if (!document.fullscreenElement) {
+                    document.documentElement.requestFullscreen();
+                }
+            }
+            if (e.key === 'Escape') {
+                if (document.fullscreenElement) {
+                    document.exitFullscreen();
+                }
+                if (!settingsMenu.classList.contains('hidden')) {
+                    settingsMenu.classList.add('hidden');
+                }
+            }
+        });
+        
+        document.addEventListener('touchstart', (e) => {
+            if (e.target.closest('#settingsMenu')) return;
+            
+            const touch = e.touches[0];
+            touchStartY = touch.clientY;
+            touchStartX = touch.clientX;
+            touchStartTime = Date.now();
+        }, { passive: true });
+        
+        document.addEventListener('touchend', (e) => {
+            if (e.target.closest('#settingsMenu')) return;
+            
+            const touch = e.changedTouches[0];
+            const touchEndY = touch.clientY;
+            const touchEndX = touch.clientX;
+            const touchDuration = Date.now() - touchStartTime;
+            
+            const deltaY = touchStartY - touchEndY;
+            const deltaX = Math.abs(touchStartX - touchEndX);
+            
+            if (deltaY > SWIPE_THRESHOLD && deltaX < SWIPE_THRESHOLD && touchDuration < 500) {
+                if (!document.fullscreenElement) {
+                    document.documentElement.requestFullscreen().catch(err => {
+                        console.log('Fullscreen nicht verfügbar:', err);
+                    });
+                }
+                return;
+            }
+            
+            if (deltaY < 30 && touchDuration < 300) {
+                const now = Date.now();
+                const timeSinceLastTap = now - lastTapTime;
+                
+                if (timeSinceLastTap < DOUBLE_TAP_DELAY && timeSinceLastTap > 0) {
+                    settingsMenu.classList.toggle('hidden');
+                    lastTapTime = 0;
+                } else {
+                    lastTapTime = now;
+                }
+            }
+        }, { passive: true });
+        
+        document.getElementById('closeSettings').addEventListener('click', () => {
+            settingsMenu.classList.add('hidden');
+        });
+        
+        document.getElementById('settingSelect').addEventListener('change', (e) => {
+            CONFIG.setting = parseInt(e.target.value);
+        });
+        
+        document.getElementById('colorSchemeSelect').addEventListener('change', (e) => {
+            CONFIG.colorScheme = e.target.value;
+        });
+        
+        document.getElementById('satRange').addEventListener('input', (e) => {
+            CONFIG.sat = e.target.value / 100;
+            document.getElementById('satValue').textContent = (e.target.value / 100).toFixed(2);
+        });
+        
+        document.getElementById('lumRange').addEventListener('input', (e) => {
+            CONFIG.lum = e.target.value / 100;
+            document.getElementById('lumValue').textContent = (e.target.value / 100).toFixed(2);
+        });
+        
+        document.getElementById('farbvRange').addEventListener('input', (e) => {
+            CONFIG.farbv = e.target.value / 100;
+            document.getElementById('farbvValue').textContent = (e.target.value / 100).toFixed(2);
+        });
+        
+        document.getElementById('gapRange').addEventListener('input', (e) => {
+            const value = parseInt(e.target.value);
+            CONFIG.gap_sm = value;
+            CONFIG.gap_mh = value;
+            document.getElementById('gapValue').textContent = value;
+        });
+        
+        document.getElementById('txtimeSelect').addEventListener('change', (e) => {
+            CONFIG.txtime = e.target.value === 'true';
+        });
+        
+        document.getElementById('settingSelect').value = CONFIG.setting;
+        document.getElementById('colorSchemeSelect').value = CONFIG.colorScheme;
+        document.getElementById('satRange').value = CONFIG.sat * 100;
+        document.getElementById('lumRange').value = CONFIG.lum * 100;
+        document.getElementById('farbvRange').value = CONFIG.farbv * 100;
+        document.getElementById('gapRange').value = CONFIG.gap_sm;
+        document.getElementById('txtimeSelect').value = CONFIG.txtime.toString();
+        
+        resizeCanvas();
+        animate();
+        
+        console.log('Harmonic Clock PWA gestartet');
+    </script>
+</body>
+</html>
