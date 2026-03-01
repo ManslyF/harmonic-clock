@@ -39,9 +39,9 @@
             0% { opacity: 1; filter: brightness(1); }
             20% { opacity: var(--flicker-darkness); filter: brightness(var(--flicker-darkness)); }
             40% { opacity: 1; filter: brightness(var(--flicker-brightness)); }
-            60% { opacity: 0.4; filter: brightness(var(--flicker-mid-bright)); }
-            80% { opacity: 0.2; filter: brightness(var(--flicker-end-bright)); }
-            100% { opacity: 0.0; filter: brightness(1); }
+			50% { opacity: 0; filter: brightness(var(--flicker-brightness)); }
+			51% { opacity: 0.5 filter: brightness(var(--flicker-darkness)); }
+            100% { opacity: 1; filter: brightness(1); }
         }
         
         #timeDisplay {
@@ -248,9 +248,9 @@
             
             // Flacker-Effekt Einstellungen
             flickerEnabled: true,     // Flacker-Effekt ein/aus
-            flickerDuration: 400,     // Gesamtdauer in ms
+            flickerDuration: 1000,     // Gesamtdauer in ms
             flickerDarkness: 0.99,     // Wie dunkel beim Fade (0.0-1.0)
-            flickerBrightness: 4.99,   // Wie hell beim Aufblitzen (1.0-5.0)
+            flickerBrightness: 1.99,   // Wie hell beim Aufblitzen (1.0-5.0)
             flickerMidBright: 2.5,    // Mittlere Helligkeit
             flickerEndBright: 3.3     // Helligkeit vor Normalzustand
         };
